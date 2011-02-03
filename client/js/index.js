@@ -6,6 +6,10 @@ var PACKET_MOTD = "0";
 var PACKET_JOINED = "1";
 var PACKET_MESSAGE = "2";
 var PACKET_LEFT = "3";
+var PACKET_USERLIST = "4";
+var PACKET_LOGIN = "5";
+var PACKET_LOGIN_NAMETAKEN = "6";
+var PACKET_LOGIN_PASSWORD = "7";
 var username;
 
 $(document).ready(function() {
@@ -22,18 +26,32 @@ function init() {
     $('#send').click(function() { sendMessage(); });
     $('#input').focus();
 
-    promptUsername();
+    promptUsername("Input a desired user name");
 }
 
-function promptUsername() {
+function promptUsername(message) {
 	while(!username) {
-  		username = prompt("Input a desired user name");
+  		username = prompt(message);
   		if (username == null) {
 			promptCanceled();
 			return;
 		}
   	}
+  	username = ucfirst(username);
   	load();
+}
+
+function promptPassword() {
+	var password;
+	while(!password) {
+  		password = prompt('Input password');
+  		if (password == null) {
+			promptCanceled();
+			return;
+		}
+  	}
+  	
+  	socket.send(PACKET_LOGIN_PASSWORD+chr(0)+password);
 }
 
 function promptCanceled() {
@@ -46,8 +64,7 @@ function load() {
 }
 
 function onSocketConnected() {
-	connected = true;
-    socket.send(PACKET_JOINED+chr(0)+username);
+    socket.send(PACKET_LOGIN+chr(0)+username);
 }
 
 function onSocketData(packet) {
@@ -55,11 +72,12 @@ function onSocketData(packet) {
     
     switch (data[0]) {
         case PACKET_MOTD:
+        	connected = true;
             output(data[1]);
             break;
         case PACKET_JOINED:
             output('User "'+data[1]+'" has joined.');
-            $('#userlist').append('<option>'+data[1]+'</option>');
+            $('#userlist').append('<option id="'+data[1]+'">'+data[1]+'</option>');
             break;
         case PACKET_MESSAGE:
         	var params = data[1].split(chr(1));
@@ -67,7 +85,24 @@ function onSocketData(packet) {
             break;
         case PACKET_LEFT:
         	output('User "'+data[1]+'" has left.');
+        	$('#'+data[1]).remove();
             break;
+        case PACKET_USERLIST:
+        	var users = data[1].split(chr(1));
+        	for (i in users) {
+        		if (users[i]) {
+        			$('#userlist').append('<option id="'+users[i]+'">'+users[i]+'</option>');
+        		}
+        	}
+        	break;
+        case PACKET_LOGIN_NAMETAKEN:
+        	socket.disconnect();
+        	username = null;
+        	promptUsername("User name taken, Input a different user name");
+        	break;
+        case PACKET_LOGIN_PASSWORD:
+        	promptPassword();
+        	break;
         default:
             alert('[ERROR] command \''+data[0]+'\' does not exist. (packet='+packet+')');
     }
@@ -81,15 +116,21 @@ function sendMessage() {
 	if (!connected) return;
 	
 	var message = $('#input').val();
-	$('#input').val('');
+	$('#input').val('').focus();
 	if (!message.replace(/ /g, '')) return;
 	socket.send(PACKET_MESSAGE+chr(0)+message);
 }
 
 function output(message) {
 	$('#output').append(message+'<br />');
+	$('#output').scrollTop($("#output").attr('scrollHeight'));
 }
 
 function chr(i) { 
     return String.fromCharCode(i);
+}
+
+function ucfirst(str) {
+	var firstLetter = str.slice(0,1);
+	return firstLetter.toUpperCase() + str.substring(1);
 }
