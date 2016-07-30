@@ -1,5 +1,5 @@
 var socket;
-var ip = '67.181.244.12';
+var ip = 'YOUR.IP.HERE';
 var port = 4133; //4132;
 var connected;
 var PACKET_MOTD = "0";
